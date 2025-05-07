@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    canvas {
+      border: 1px solid black;
+      display: block;
+      margin: 0 auto;
+    }
+    body {
+      text-align: center;
+      font-family: Arial, sans-serif;
+    }
+    #error {
+      color: red;
+    }
+    h1 {
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="800" height="400"></canvas>
+<p>Нажмите пробел для прыжка</p>
+<div id="error"></div>
+<script src="wasm_exec.js"></script>
+<script>
+  // Предварительная загрузка изображений
+  const playerImage = new Image();
+  const playerDefeatedImage = new Image();
+  const slotMachineImage = new Image();
+  playerImage.src = "player.png";
+  playerDefeatedImage.src = "player_defeated.png";
+  slotMachineImage.src = "slot_machine.png";
+
+  // Ждем загрузки всех изображений
+  let imagesLoaded = 0;
+  let failedImages = [];
+  function checkImagesLoaded(imageName) {
+    imagesLoaded++;
+    console.log(`Изображение ${imageName} загружено, всего загружено: ${imagesLoaded}/3`);
+    if (imagesLoaded + failedImages.length === 3) {
+      if (failedImages.length > 0) {
+        document.getElementById("error").innerText = `Ошибка загрузки: ${failedImages.join(", ")}`;
+        console.error("Не все изображения загружены:", failedImages);
+      } else {
+        console.log("Все изображения загружены успешно");
+      }
+      // Передаем изображения в глобальную область
+      window.playerImage = playerImage;
+      window.playerDefeatedImage = playerDefeatedImage;
+      window.slotMachineImage = slotMachineImage;
+      // Запускаем WASM
+      const go = new Go();
+      WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject)
+              .then((result) => {
+                console.log("WASM загружен успешно");
+                go.run(result.instance);
+              })
+              .catch((err) => {
+                console.error("Ошибка загрузки WASM:", err);
+                document.getElementById("error").innerText = "Ошибка загрузки игры: " + err;
+              });
+    }
+  }
+
+  playerImage.onload = () => checkImagesLoaded("player.png");
+  playerDefeatedImage.onload = () => checkImagesLoaded("player_defeated.png");
+  slotMachineImage.onload = () => checkImagesLoaded("slot_machine.png");
+  playerImage.onerror = () => {
+    console.error("Ошибка загрузки player.png");
+    failedImages.push("player.png");
+    checkImagesLoaded("player.png");
+  };
+  playerDefeatedImage.onerror = () => {
+    console.error("Ошибка загрузки player_defeated.png");
+    failedImages.push("player_defeated.png");
+    checkImagesLoaded("player_defeated.png");
+  };
+  slotMachineImage.onerror = () => {
+    console.error("Ошибка загрузки slot_machine.png");
+    failedImages.push("slot_machine.png");
+    checkImagesLoaded("slot_machine.png");
+  };
+
+  if (!WebAssembly.instantiateStreaming) {
+    console.error("Браузер не поддерживает WebAssembly.instantiateStreaming");
+    document.getElementById("error").innerText = "Ваш браузер не поддерживает WebAssembly.instantiateStreaming";
+  }
+</script>
+</body>
+</html>
